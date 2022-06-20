@@ -8,7 +8,7 @@
 
 namespace Packet
 {
-template <uint32_t SIZE, Layers::Deserializable... Layers>
+template <Layers::Deserializable... Layers>
 class Packet
 {
 public:
@@ -19,16 +19,28 @@ public:
     }
 
     template<typename Layer>
-    bool Set(Layer &&layer)
+    auto &Fetch()
     {
-        size_t size{};
-        auto curr{this->GetLayer<sizeof...(Layers), Layer, Layers...>(size)};
-        curr = layer;
-        return true;
+        return _Get<sizeof...(Layers), 0, Layer, Layers...>(); 
+    }
+
+    const uint8_t *Serialize()
+    {
+        return m_data;
+    }
+
+    bool Deserialize(const uint8_t *data, size_t data_size)
+    {
+        if (data_size < sizeof(m_data))
+        {
+            return false;
+        }
+
+        return _Deserialize<0, Layers...>(data);
     }
 
 private:
-    uint8_t m_data[Utils::total_size<Layers...>() + SIZE];
+    uint8_t m_data[Utils::total_size<Layers...>()];
 
     /**
      * Constructs each layer inside the packet's data.
@@ -51,29 +63,36 @@ private:
             init_layers<N - 1, Rest...>(total_size);
         }
     }
-    template<size_t N, typename Target, class First, class... Rest>
-    constexpr Target &GetLayer(size_t &total_size)
+    
+    template<size_t LAYER_NUMBER, size_t DATA_OFFSET, typename Target, class First, class... Rest>
+    constexpr Target &_Get()
     {
-        if constexpr (N == 0)
-        {
-            return m_data;
-        }
+
+        static_assert(!(LAYER_NUMBER == 1 && !std::is_same<Target, First>::value), "Tried to fetch a non existing layer");
 
         if constexpr (std::is_same<Target, First>::value)
         {
-            return m_data + total_size;
-        }
-
-        total_size += sizeof(First);
-        if constexpr (N == 1)
-        {
-            return m_data;
+            return *reinterpret_cast<Target*>(m_data + DATA_OFFSET);
         }
         else
         {
-            GetLayer<N - 1, Target, Rest...>(total_size);
+            return _Get<LAYER_NUMBER - 1, DATA_OFFSET + sizeof(First), Target, Rest...>();
         }
     }
+
+    template<size_t CURRENT_OFFSET, class First, class... Rest>
+    bool _Deserialize(const uint8_t *data)
+    {
+        return (*reinterpret_cast<First*>(m_data + CURRENT_OFFSET)).Deserialize(data) && \
+                _Deserialize<CURRENT_OFFSET + sizeof(First), Rest...>(data + sizeof(First));
+    }
+
+    template<size_t CURRENT_OFFSET>
+    bool _Deserialize(const uint8_t *data)
+    {
+        return true;
+    }
+
 };
 } // namespace Packet
 

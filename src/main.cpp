@@ -6,17 +6,42 @@ struct Test {
     {
         printf("Whihihih\n");
     }
-    bool Deserialize(uint8_t *data)
+    bool Deserialize(const uint8_t *data)
     {
         return true;
     }
-    uint32_t a;
+    void print()
+    {
+        printf("Success! %d\n", a);
+    }
+    uint32_t a{30};
 };
+
+struct Test2 {
+    Test2()
+    {
+        printf("Whihihih\n");
+    }
+    bool Deserialize(const uint8_t *data)
+    {
+        return true;
+    }
+
+    void print()
+    {
+        printf("Success! %d\n", a);
+    }
+    uint32_t a{69};
+};
+
+
 int main(void)
 {
-    Packet::Packet<300, Test> x{};
-    printf("sizoef data: %u\n sizeof test: %u\n", sizeof(x), sizeof(Test));
-    Test l{};
-    x.Set(l);
+    Packet::Packet<Test> x{};
+    printf("sizoef data: %lu\n sizeof test: %lu\n", sizeof(x), sizeof(Test));
+    auto l{x.Fetch<Test>()};
+    uint8_t buf;
+    printf("%d --- %d\n", l.Deserialize(&buf), x.Deserialize(&buf, 8));
+    l.print();
     return 0;
 }
